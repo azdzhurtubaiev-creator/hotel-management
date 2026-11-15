@@ -1,103 +1,153 @@
 using System;
+using System.Globalization;
 
 namespace HotelManagement
 {
     public class Booking : IPayable, IPrintable
     {
-        private Guest _guest;
-
-        private Room _room;
-
+        private readonly Guest _guest;
+        private readonly Room _room;
         private Payment? _payment;
 
         public Booking(Guest guest, Room room, DateTime checkIn, DateTime checkOut)
         {
-            throw new NotImplementedException();
+            _guest = guest ?? throw new ArgumentNullException(nameof(guest), "Гість не може бути відсутнім!");
+            _room = room ?? throw new ArgumentNullException(nameof(room), "Номер не може бути відсутнім!");
+
+            if (checkOut.Date <= checkIn.Date)
+            {
+                throw new ArgumentException("Дата виїзду має бути пізніше дати заїзду!");
+            }
+
+            CheckIn = checkIn.Date;
+            CheckOut = checkOut.Date;
+            Status = BookingStatus.Created;
         }
 
         public Guest Guest
         {
-            get => throw new NotImplementedException();
+            get => _guest;
         }
 
         public Room Room
         {
-            get => throw new NotImplementedException();
+            get => _room;
         }
 
-        public DateTime CheckIn
-        {
-            get => throw new NotImplementedException();
-        }
+        public DateTime CheckIn { get; }
 
-        public DateTime CheckOut
-        {
-            get => throw new NotImplementedException();
-        }
+        public DateTime CheckOut { get; }
 
-        public BookingStatus Status
-        {
-            get => throw new NotImplementedException();
-        }
+        public BookingStatus Status { get; private set; }
 
         public Payment? Payment
         {
-            get => throw new NotImplementedException();
+            get => _payment;
         }
 
         public bool IsPaid
         {
-            get => throw new NotImplementedException();
+            get => _payment != null;
         }
 
         public bool IsActive
         {
-            get => throw new NotImplementedException();
+            get => Status != BookingStatus.Cancelled && Status != BookingStatus.CheckedOut;
         }
 
         public int GetNights()
         {
-            throw new NotImplementedException();
+            return (CheckOut - CheckIn).Days;
         }
 
         public decimal CalculateTotal()
         {
-            throw new NotImplementedException();
+            return GetNights() * _room.PricePerNight;
         }
 
         public bool Overlaps(DateTime from, DateTime to)
         {
-            throw new NotImplementedException();
+            if (to.Date <= from.Date)
+            {
+                throw new ArgumentException("Кінець періоду має бути пізніше початку!");
+            }
+
+            return from.Date < CheckOut && to.Date > CheckIn;
         }
 
         public void Confirm()
         {
-            throw new NotImplementedException();
+            if (Status != BookingStatus.Created)
+            {
+                throw new InvalidOperationException("Підтвердити можна тільки щойно створене бронювання!");
+            }
+
+            Status = BookingStatus.Confirmed;
         }
 
         public void CheckInGuest()
         {
-            throw new NotImplementedException();
+            if (Status != BookingStatus.Confirmed)
+            {
+                throw new InvalidOperationException("Заселити можна тільки за підтвердженим бронюванням!");
+            }
+
+            Status = BookingStatus.CheckedIn;
         }
 
         public void CheckOutGuest()
         {
-            throw new NotImplementedException();
+            if (Status != BookingStatus.CheckedIn)
+            {
+                throw new InvalidOperationException("Виселити можна тільки заселеного гостя!");
+            }
+
+            if (!IsPaid)
+            {
+                throw new InvalidOperationException("Перед виселенням бронювання має бути оплачене!");
+            }
+
+            Status = BookingStatus.CheckedOut;
         }
 
         public void Cancel()
         {
-            throw new NotImplementedException();
+            if (Status != BookingStatus.Created && Status != BookingStatus.Confirmed)
+            {
+                throw new InvalidOperationException("Скасувати можна тільки бронювання до заселення!");
+            }
+
+            Status = BookingStatus.Cancelled;
         }
 
         public Payment Pay(PaymentMethod method)
         {
-            throw new NotImplementedException();
+            if (Status == BookingStatus.Cancelled)
+            {
+                throw new InvalidOperationException("Скасоване бронювання не можна оплатити!");
+            }
+
+            if (IsPaid)
+            {
+                throw new InvalidOperationException("Бронювання вже оплачене!");
+            }
+
+            _payment = new Payment(CalculateTotal(), method);
+            return _payment;
         }
 
         public string GetInfo()
         {
-            throw new NotImplementedException();
+            string from = CheckIn.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture);
+            string to = CheckOut.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture);
+            string paid = IsPaid ? "оплачено" : "не оплачено";
+
+            return $"{_guest.GetFullName()}, номер {_room.Number}, {from} - {to}, {GetNights()} ноч., {CalculateTotal():0.##} грн, {Status}, {paid}";
+        }
+
+        public override string ToString()
+        {
+            return GetInfo();
         }
     }
 }

@@ -2,26 +2,34 @@ using System;
 
 namespace HotelManagement
 {
-    public class Payment
+    public class Payment : IPrintable
     {
         public Payment(decimal amount, PaymentMethod method)
         {
-            throw new NotImplementedException();
+            if (amount <= 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(amount), "Сума оплати має бути більше 0!");
+            }
+
+            if (!Enum.IsDefined(typeof(PaymentMethod), method))
+            {
+                throw new ArgumentException("Обрано неіснуючий спосіб оплати!", nameof(method));
+            }
+
+            Amount = amount;
+            Method = method;
+            PaidAt = DateTime.Now;
         }
 
-        public decimal Amount
-        {
-            get => throw new NotImplementedException();
-        }
+        public decimal Amount { get; }
 
-        public PaymentMethod Method
-        {
-            get => throw new NotImplementedException();
-        }
+        public PaymentMethod Method { get; }
 
-        public DateTime PaidAt
+        public DateTime PaidAt { get; }
+
+        public string GetInfo()
         {
-            get => throw new NotImplementedException();
+            return $"Оплата {Amount:0.##} грн ({Method}), {PaidAt:dd.MM.yyyy HH:mm}";
         }
     }
 }

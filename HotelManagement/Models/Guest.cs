@@ -3,43 +3,53 @@ using System.Collections.Generic;
 
 namespace HotelManagement
 {
-    public class Guest : IPerson
+    public class Guest : Person
     {
-        private List<Booking> _bookings;
+        private readonly List<Booking> _bookings = new List<Booking>();
 
         public Guest(string firstName, string lastName, string phone)
+            : base(firstName, lastName, phone)
         {
-            throw new NotImplementedException();
         }
 
-        public string FirstName
+        public override string Role
         {
-            get => throw new NotImplementedException();
-        }
-
-        public string LastName
-        {
-            get => throw new NotImplementedException();
-        }
-
-        public string Phone
-        {
-            get => throw new NotImplementedException();
+            get => "Гість";
         }
 
         public IReadOnlyList<Booking> Bookings
         {
-            get => throw new NotImplementedException();
+            get => _bookings.AsReadOnly();
         }
 
-        public string GetFullName()
+        public override string GetGreeting()
         {
-            throw new NotImplementedException();
+            return $"Ласкаво просимо до готелю, {FirstName}!";
+        }
+
+        public override string GetInfo()
+        {
+            return $"{base.GetInfo()}, бронювань: {_bookings.Count}";
         }
 
         public void AddBooking(Booking booking)
         {
-            throw new NotImplementedException();
+            if (booking == null)
+            {
+                throw new ArgumentNullException(nameof(booking), "Бронювання не може бути відсутнім!");
+            }
+
+            if (booking.Guest != this)
+            {
+                throw new ArgumentException("Це бронювання належить іншому гостю!", nameof(booking));
+            }
+
+            if (_bookings.Contains(booking))
+            {
+                throw new InvalidOperationException("Це бронювання вже додано!");
+            }
+
+            _bookings.Add(booking);
         }
     }
 }

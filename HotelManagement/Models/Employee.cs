@@ -2,48 +2,69 @@ using System;
 
 namespace HotelManagement
 {
-    public class Employee : IPerson
+    public class Employee : Person
     {
+        private Position _position;
+        private decimal _salary;
+
         public Employee(string firstName, string lastName, string phone, Position position, decimal salary)
+            : base(firstName, lastName, phone)
         {
-            throw new NotImplementedException();
+            Position = position;
+            Salary = salary;
         }
 
-        public string FirstName
+        public override string Role
         {
-            get => throw new NotImplementedException();
-        }
-
-        public string LastName
-        {
-            get => throw new NotImplementedException();
-        }
-
-        public string Phone
-        {
-            get => throw new NotImplementedException();
+            get => "Працівник";
         }
 
         public Position Position
         {
-            get => throw new NotImplementedException();
-            set => throw new NotImplementedException();
+            get => _position;
+            set
+            {
+                if (!Enum.IsDefined(typeof(Position), value))
+                {
+                    throw new ArgumentException("Обрано неіснуючу посаду!", nameof(Position));
+                }
+
+                _position = value;
+            }
         }
 
         public decimal Salary
         {
-            get => throw new NotImplementedException();
-            set => throw new NotImplementedException();
+            get => _salary;
+            set
+            {
+                if (value < 0)
+                {
+                    throw new ArgumentOutOfRangeException(nameof(Salary), "Зарплата не може бути від'ємною!");
+                }
+
+                _salary = value;
+            }
         }
 
-        public string GetFullName()
+        public override string GetGreeting()
         {
-            throw new NotImplementedException();
+            return $"Гарної зміни, {FirstName}!";
+        }
+
+        public override string GetInfo()
+        {
+            return $"{base.GetInfo()}, посада: {Position}, зарплата: {Salary:0.##} грн";
         }
 
         public void RaiseSalary(decimal percent)
         {
-            throw new NotImplementedException();
+            if (percent <= 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(percent), "Відсоток підвищення має бути більше 0!");
+            }
+
+            Salary = Math.Round(Salary * (1 + percent / 100), 2);
         }
     }
 }
