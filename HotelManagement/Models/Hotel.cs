@@ -12,6 +12,8 @@ namespace HotelManagement
         private readonly List<Booking> _bookings = new List<Booking>();
         private int _stars;
 
+        public event HotelNotifier? Notify;
+
         public Hotel(string name, int stars, string address)
         {
             if (string.IsNullOrWhiteSpace(name))
@@ -75,7 +77,9 @@ namespace HotelManagement
             }
 
             Room room = new Room(number, type, pricePerNight);
+            room.PriceChanged += OnRoomPriceChanged;
             _rooms.Add(room);
+            RaiseNotify($"Додано номер {number} ({type}), {pricePerNight:0.##} грн/ніч");
             return room;
         }
 
@@ -98,7 +102,10 @@ namespace HotelManagement
                 throw new InvalidOperationException("Не можна видалити номер з активним бронюванням!");
             }
 
-            return _rooms.Remove(room);
+            room.PriceChanged -= OnRoomPriceChanged;
+            _rooms.Remove(room);
+            RaiseNotify($"Видалено номер {number}");
+            return true;
         }
 
         public List<Room> GetSortedRooms()
@@ -141,6 +148,7 @@ namespace HotelManagement
             }
 
             _guests.Add(guest);
+            RaiseNotify($"Зареєстровано гостя {guest.GetFullName()}");
         }
 
         public Guest? FindGuestByPhone(string phone)
@@ -215,8 +223,10 @@ namespace HotelManagement
                 throw new InvalidOperationException($"Номер {roomNumber} уже зайнятий на ці дати!");
             }
 
+            booking.StatusChanged += OnBookingStatusChanged;
             _bookings.Add(booking);
             guest.AddBooking(booking);
+            RaiseNotify($"Створено бронювання: {guest.GetFullName()}, номер {roomNumber}");
             return booking;
         }
 
@@ -290,6 +300,96 @@ namespace HotelManagement
             }
 
             return Math.Round(busy * 100.0 / _rooms.Count, 2);
+        }
+
+        public List<Room> FindRooms(Predicate<Room> condition)
+        {
+            if (condition == null)
+            {
+                throw new ArgumentNullException(nameof(condition), "Умова пошуку не може бути відсутньою!");
+            }
+
+            return _rooms.FindAll(condition);
+        }
+
+        public List<Booking> FindBookings(Predicate<Booking> condition)
+        {
+            if (condition == null)
+            {
+                throw new ArgumentNullException(nameof(condition), "Умова пошуку не може бути відсутньою!");
+            }
+
+            return _bookings.FindAll(condition);
+        }
+
+        public decimal SumBookings(Func<Booking, decimal> selector, Predicate<Booking> condition)
+        {
+            if (selector == null)
+            {
+                throw new ArgumentNullException(nameof(selector), "Функція підрахунку не може бути відсутньою!");
+            }
+
+            if (condition == null)
+            {
+                throw new ArgumentNullException(nameof(condition), "Умова відбору не може бути відсутньою!");
+            }
+
+            decimal total = 0;
+
+            foreach (Booking booking in _bookings)
+            {
+                if (condition(booking))
+                {
+                    total += selector(booking);
+                }
+            }
+
+            return total;
+        }
+
+        public void ForEachRoom(Action<Room> action)
+        {
+            if (action == null)
+            {
+                throw new ArgumentNullException(nameof(action), "Дія не може бути відсутньою!");
+            }
+
+            foreach (Room room in new List<Room>(_rooms))
+            {
+                action(room);
+            }
+        }
+
+        public decimal CalculateExpectedIncome(DiscountRule rule)
+        {
+            if (rule == null)
+            {
+                throw new ArgumentNullException(nameof(rule), "Правило знижки не може бути відсутнім!");
+            }
+
+            decimal total = 0;
+
+            foreach (Booking booking in _bookings.FindAll(b => b.IsActive))
+            {
+                total += booking.CalculateTotal(rule);
+            }
+
+            return total;
+        }
+
+        private void RaiseNotify(string message)
+        {
+            Notify?.Invoke(message);
+        }
+
+        private void OnBookingStatusChanged(Booking booking, BookingStatus oldStatus, BookingStatus newStatus)
+        {
+            RaiseNotify($"Бронювання {booking.Guest.GetFullName()}, номер {booking.Room.Number}: {oldStatus} -> {newStatus}");
+        }
+
+        private void OnRoomPriceChanged(Room room, decimal oldPrice, decimal newPrice)
+        {
+            RaiseNotify($"Ціна номера {room.Number}: {oldPrice:0.##} -> {newPrice:0.##} грн/ніч");
         }
 
         public IEnumerator<Room> GetEnumerator()

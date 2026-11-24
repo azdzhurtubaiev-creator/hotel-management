@@ -7,7 +7,10 @@ namespace HotelManagement
     {
         private readonly Guest _guest;
         private readonly Room _room;
+        private readonly decimal _nightPrice;
         private Payment? _payment;
+
+        public event BookingStatusHandler? StatusChanged;
 
         public Booking(Guest guest, Room room, DateTime checkIn, DateTime checkOut)
         {
@@ -19,6 +22,7 @@ namespace HotelManagement
                 throw new ArgumentException("Дата виїзду має бути пізніше дати заїзду!");
             }
 
+            _nightPrice = room.PricePerNight;
             CheckIn = checkIn.Date;
             CheckOut = checkOut.Date;
             Status = BookingStatus.Created;
@@ -32,6 +36,11 @@ namespace HotelManagement
         public Room Room
         {
             get => _room;
+        }
+
+        public decimal NightPrice
+        {
+            get => _nightPrice;
         }
 
         public DateTime CheckIn { get; }
@@ -62,7 +71,31 @@ namespace HotelManagement
 
         public decimal CalculateTotal()
         {
-            return GetNights() * _room.PricePerNight;
+            return GetNights() * _nightPrice;
+        }
+
+        public decimal CalculateTotal(DiscountRule rule)
+        {
+            if (rule == null)
+            {
+                throw new ArgumentNullException(nameof(rule), "Правило знижки не може бути відсутнім!");
+            }
+
+            decimal percent = rule(this);
+
+            if (percent < 0 || percent >= 100)
+            {
+                throw new InvalidOperationException("Відсоток знижки має бути від 0 до 99!");
+            }
+
+            return CalculateTotal() * (100 - percent) / 100;
+        }
+
+        private void ChangeStatus(BookingStatus newStatus)
+        {
+            BookingStatus oldStatus = Status;
+            Status = newStatus;
+            StatusChanged?.Invoke(this, oldStatus, newStatus);
         }
 
         public bool Overlaps(DateTime from, DateTime to)
@@ -82,7 +115,7 @@ namespace HotelManagement
                 throw new InvalidOperationException("Підтвердити можна тільки щойно створене бронювання!");
             }
 
-            Status = BookingStatus.Confirmed;
+            ChangeStatus(BookingStatus.Confirmed);
         }
 
         public void CheckInGuest()
@@ -92,7 +125,7 @@ namespace HotelManagement
                 throw new InvalidOperationException("Заселити можна тільки за підтвердженим бронюванням!");
             }
 
-            Status = BookingStatus.CheckedIn;
+            ChangeStatus(BookingStatus.CheckedIn);
         }
 
         public void CheckOutGuest()
@@ -107,7 +140,7 @@ namespace HotelManagement
                 throw new InvalidOperationException("Перед виселенням бронювання має бути оплачене!");
             }
 
-            Status = BookingStatus.CheckedOut;
+            ChangeStatus(BookingStatus.CheckedOut);
         }
 
         public void Cancel()
@@ -117,10 +150,20 @@ namespace HotelManagement
                 throw new InvalidOperationException("Скасувати можна тільки бронювання до заселення!");
             }
 
-            Status = BookingStatus.Cancelled;
+            ChangeStatus(BookingStatus.Cancelled);
         }
 
         public Payment Pay(PaymentMethod method)
+        {
+            return PayAmount(CalculateTotal(), method);
+        }
+
+        public Payment Pay(PaymentMethod method, DiscountRule rule)
+        {
+            return PayAmount(CalculateTotal(rule), method);
+        }
+
+        private Payment PayAmount(decimal amount, PaymentMethod method)
         {
             if (Status == BookingStatus.Cancelled)
             {
@@ -132,7 +175,7 @@ namespace HotelManagement
                 throw new InvalidOperationException("Бронювання вже оплачене!");
             }
 
-            _payment = new Payment(CalculateTotal(), method);
+            _payment = new Payment(amount, method);
             return _payment;
         }
 

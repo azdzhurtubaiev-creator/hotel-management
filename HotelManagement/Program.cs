@@ -10,11 +10,16 @@ namespace HotelManagement
         private const string DateFormat = "dd.MM.yyyy";
 
         private static Hotel _hotel = new Hotel("Харків Палас", 4, "Харків, вул. Сумська, 10");
+        private static List<string> _eventLog = new List<string>();
+        private static bool _printNotifications = true;
 
         static void Main(string[] args)
         {
             Console.OutputEncoding = Encoding.UTF8;
             Console.InputEncoding = Encoding.UTF8;
+
+            _hotel.Notify += PrintNotification;
+            _hotel.Notify += SaveToLog;
 
             Console.WriteLine($"=== Система управління готелем «{_hotel.Name}» ({_hotel.Stars}*) ===");
             Console.WriteLine($"Адреса: {_hotel.Address}");
@@ -45,7 +50,7 @@ namespace HotelManagement
                         case "3": EmployeesMenu(); break;
                         case "4": BookingsMenu(); break;
                         case "5": SearchFreeRooms(); break;
-                        case "6": ShowReports(); break;
+                        case "6": ReportsMenu(); break;
                         case "7": DemonstratePolymorphism(); break;
                         case "8": FillDemoData(); break;
                         case "0": running = false; break;
@@ -68,6 +73,8 @@ namespace HotelManagement
                 "2. Додати номер",
                 "3. Змінити ціну номера",
                 "4. Видалити номер",
+                "5. Знайти номери за умовою (Predicate<Room>)",
+                "6. Дії над усіма номерами (Action<Room>)",
                 "0. Назад");
 
             switch (ReadChoice())
@@ -76,6 +83,8 @@ namespace HotelManagement
                 case "2": AddRoom(); break;
                 case "3": ChangeRoomPrice(); break;
                 case "4": RemoveRoom(); break;
+                case "5": FindRoomsByCondition(); break;
+                case "6": RunRoomActions(); break;
                 case "0": break;
                 default: Console.WriteLine("Невірний пункт меню!"); break;
             }
@@ -269,6 +278,8 @@ namespace HotelManagement
                 "5. Оплатити бронювання",
                 "6. Виселити гостя",
                 "7. Скасувати бронювання",
+                "8. Підсумки по бронюваннях (Func + Predicate)",
+                "9. Оплатити бронювання зі знижкою (DiscountRule)",
                 "0. Назад");
 
             switch (ReadChoice())
@@ -280,6 +291,8 @@ namespace HotelManagement
                 case "5": PayBooking(); break;
                 case "6": CheckOutBooking(); break;
                 case "7": CancelBooking(); break;
+                case "8": ShowBookingTotals(); break;
+                case "9": PayBookingWithDiscount(); break;
                 case "0": break;
                 default: Console.WriteLine("Невірний пункт меню!"); break;
             }
@@ -382,6 +395,26 @@ namespace HotelManagement
             }
         }
 
+        private static void ReportsMenu()
+        {
+            ShowMenu("ЗВІТИ",
+                "1. Загальний звіт",
+                "2. Очікуваний дохід зі знижкою (DiscountRule)",
+                "3. Журнал подій",
+                "4. Увімкнути / вимкнути виведення сповіщень на екран",
+                "0. Назад");
+
+            switch (ReadChoice())
+            {
+                case "1": ShowReports(); break;
+                case "2": ShowIncomeWithDiscount(); break;
+                case "3": ShowEventLog(); break;
+                case "4": ToggleNotifications(); break;
+                case "0": break;
+                default: Console.WriteLine("Невірний пункт меню!"); break;
+            }
+        }
+
         private static void ShowReports()
         {
             Console.WriteLine($"Номерів: {_hotel.Rooms.Count}, гостей: {_hotel.Guests.Count}, працівників: {_hotel.Employees.Count}, бронювань: {_hotel.Bookings.Count}");
@@ -462,6 +495,208 @@ namespace HotelManagement
             _hotel.CreateBooking(maria, 201, new DateTime(2026, 11, 21), new DateTime(2026, 11, 22));
 
             Console.WriteLine("Додано 4 номери, 2 працівників, 2 гостей і 2 бронювання.");
+        }
+
+        private static void PrintNotification(string message)
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine("[ПОДІЯ] " + message);
+            Console.ResetColor();
+        }
+
+        private static void SaveToLog(string message)
+        {
+            string time = DateTime.Now.ToString("HH:mm:ss", CultureInfo.InvariantCulture);
+            _eventLog.Add(time + " " + message);
+        }
+
+        private static void ShowEventLog()
+        {
+            if (_eventLog.Count == 0)
+            {
+                Console.WriteLine("Журнал подій порожній.");
+                return;
+            }
+
+            Console.WriteLine($"Журнал подій (записів: {_eventLog.Count}):");
+
+            foreach (string line in _eventLog)
+            {
+                Console.WriteLine("  " + line);
+            }
+        }
+
+        private static void ToggleNotifications()
+        {
+            if (_printNotifications)
+            {
+                _hotel.Notify -= PrintNotification;
+                _printNotifications = false;
+                Console.WriteLine("Виведення сповіщень вимкнено (відписано обробник PrintNotification). Журнал і далі ведеться.");
+            }
+            else
+            {
+                _hotel.Notify += PrintNotification;
+                _printNotifications = true;
+                Console.WriteLine("Виведення сповіщень увімкнено (підписано обробник PrintNotification).");
+            }
+        }
+
+        private static bool IsCheapRoom(Room room)
+        {
+            return room.PricePerNight <= 1000m;
+        }
+
+        private static bool IsLargeRoom(Room room)
+        {
+            return room.Capacity >= 3;
+        }
+
+        private static bool IsSuiteRoom(Room room)
+        {
+            return room.Type == RoomType.Suite;
+        }
+
+        private static bool IsAnyBooking(Booking booking)
+        {
+            return true;
+        }
+
+        private static bool IsActiveBooking(Booking booking)
+        {
+            return booking.IsActive;
+        }
+
+        private static bool IsPaidBooking(Booking booking)
+        {
+            return booking.IsPaid;
+        }
+
+        private static decimal GetNightsCount(Booking booking)
+        {
+            return booking.GetNights();
+        }
+
+        private static decimal GetBookingTotal(Booking booking)
+        {
+            return booking.CalculateTotal();
+        }
+
+        private static void PrintRoom(Room room)
+        {
+            Console.WriteLine("  " + room.GetInfo());
+        }
+
+        private static void RaiseRoomPriceBy10Percent(Room room)
+        {
+            room.PricePerNight = Math.Round(room.PricePerNight * 1.1m, 2);
+        }
+
+        private static void FindRoomsByCondition()
+        {
+            Console.WriteLine("Умова: 1 - дешеві (до 1000 грн), 2 - місткі (від 3 місць), 3 - люкси");
+            Predicate<Room> condition;
+
+            switch (ReadInt("Ваш вибір: "))
+            {
+                case 1: condition = IsCheapRoom; break;
+                case 2: condition = IsLargeRoom; break;
+                case 3: condition = IsSuiteRoom; break;
+                default: throw new ArgumentException("Невірна умова!");
+            }
+
+            List<Room> rooms = _hotel.FindRooms(condition);
+            rooms.Sort();
+            Console.WriteLine($"Знайдено номерів: {rooms.Count}");
+
+            foreach (Room room in rooms)
+            {
+                Console.WriteLine("  " + room.GetInfo());
+            }
+        }
+
+        private static void ShowBookingTotals()
+        {
+            Console.WriteLine("Що рахувати: 1 - кількість ночей, 2 - суму до оплати");
+            Func<Booking, decimal> selector;
+
+            switch (ReadInt("Ваш вибір: "))
+            {
+                case 1: selector = GetNightsCount; break;
+                case 2: selector = GetBookingTotal; break;
+                default: throw new ArgumentException("Невірний вибір!");
+            }
+
+            Console.WriteLine("Які бронювання: 1 - усі, 2 - активні, 3 - оплачені");
+            Predicate<Booking> condition;
+
+            switch (ReadInt("Ваш вибір: "))
+            {
+                case 1: condition = IsAnyBooking; break;
+                case 2: condition = IsActiveBooking; break;
+                case 3: condition = IsPaidBooking; break;
+                default: throw new ArgumentException("Невірний вибір!");
+            }
+
+            Console.WriteLine($"Підрахованих бронювань: {_hotel.FindBookings(condition).Count}");
+            Console.WriteLine($"Результат: {_hotel.SumBookings(selector, condition):0.##}");
+        }
+
+        private static DiscountRule ReadDiscountRule()
+        {
+            Console.WriteLine($"Правило: 1 - без знижки, 2 - довге проживання (від {DiscountRules.LongStayNights} ночей, -{DiscountRules.LongStayPercent}%), 3 - постійний гість (від {DiscountRules.LoyalGuestBookings} бронювань, -{DiscountRules.LoyalGuestPercent}%)");
+
+            switch (ReadInt("Ваш вибір: "))
+            {
+                case 1: return DiscountRules.NoDiscount;
+                case 2: return DiscountRules.LongStayDiscount;
+                case 3: return DiscountRules.LoyalGuestDiscount;
+                default: throw new ArgumentException("Невірне правило!");
+            }
+        }
+
+        private static void ShowIncomeWithDiscount()
+        {
+            DiscountRule rule = ReadDiscountRule();
+
+            Console.WriteLine($"Очікуваний дохід без знижки: {_hotel.CalculateExpectedIncome():0.##} грн");
+            Console.WriteLine($"Очікуваний дохід зі знижкою: {_hotel.CalculateExpectedIncome(rule):0.##} грн");
+        }
+
+        private static void PayBookingWithDiscount()
+        {
+            Booking booking = ReadExistingBooking();
+            DiscountRule rule = ReadDiscountRule();
+            Console.WriteLine($"Сума без знижки: {booking.CalculateTotal():0.##} грн");
+            Console.WriteLine($"Сума зі знижкою: {booking.CalculateTotal(rule):0.##} грн");
+            PaymentMethod method = ReadPaymentMethod();
+
+            Payment payment = booking.Pay(method, rule);
+            Console.WriteLine(payment.GetInfo());
+        }
+
+        private static void RunRoomActions()
+        {
+            Console.WriteLine("Дія: 1 - показати номери, 2 - підняти ціни на 10%, 3 - обидві дії разом");
+            Action<Room> action;
+
+            switch (ReadInt("Ваш вибір: "))
+            {
+                case 1:
+                    action = PrintRoom;
+                    break;
+                case 2:
+                    action = RaiseRoomPriceBy10Percent;
+                    break;
+                case 3:
+                    action = PrintRoom;
+                    action += RaiseRoomPriceBy10Percent;
+                    break;
+                default:
+                    throw new ArgumentException("Невірна дія!");
+            }
+
+            _hotel.ForEachRoom(action);
         }
 
         private static void PrintError(Exception ex)

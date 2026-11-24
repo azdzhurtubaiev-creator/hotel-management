@@ -6,6 +6,8 @@ namespace HotelManagement
     {
         private decimal _pricePerNight;
 
+        public event PriceChangedHandler? PriceChanged;
+
         public Room(int number, RoomType type, decimal pricePerNight)
         {
             if (number <= 0)
@@ -37,7 +39,13 @@ namespace HotelManagement
                     throw new ArgumentOutOfRangeException(nameof(PricePerNight), "Ціна за ніч має бути більше 0!");
                 }
 
+                decimal oldPrice = _pricePerNight;
                 _pricePerNight = value;
+
+                if (oldPrice != value)
+                {
+                    PriceChanged?.Invoke(this, oldPrice, value);
+                }
             }
         }
 
